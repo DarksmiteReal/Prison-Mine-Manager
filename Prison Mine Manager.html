@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Prison Mine Manager</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        .highlight {
+            background-color: #4caf50;
+            color: #fff;
+            font-weight: bold;
+        }
+        .flex {
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+        }
+        .flex img {
+            width: 30px;
+            height: 30px;
+            margin-right: 10px;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background-color: #1e1e1e;
+        }
+        .table, .table th, .table td {
+            border: 1px solid #333;
+        }
+        .table th, .table td {
+            padding: 10px;
+            text-align: center;
+            color: #e0e0e0;
+        }
+        .result {
+            margin-bottom: 20px;
+        }
+        input, select, button {
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        input::placeholder {
+            color: #bbb;
+        }
+        input[type="file"] {
+            color: #e0e0e0;
+        }
+        button {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Minecraft Prison Mine Manager</h1>
+
+
+    <input type="file" id="jsonUpload" accept=".json" onchange="loadJSONFile(event)">
+    <button onclick="saveToJSON()">Save to JSON</button>
+
+
+    <div id="mineDisplay"></div>
+
+
+    <h2>Add New Mine</h2>
+    <input type="text" id="newMineName" placeholder="Mine Name">
+    <input type="number" id="totalBlocks" value="19220" placeholder="Total Blocks (default: 19220)">
+    <h3>Add Ore</h3>
+    <input type="text" id="oreName" placeholder="Ore Name">
+    <input type="text" id="spawnRate" placeholder="Spawn Rate (%)">
+    <input type="number" id="price" placeholder="Price">
+    <select id="minecraftItems" onchange="setOreImage()"></select>
+    <img id="selectedImagePreview" style="width:50px; height:50px;">
+    <input type="text" id="imageUrl" placeholder="Or enter custom image URL">
+    <button onclick="addOre()">Add Ore</button>
+    <button onclick="addNewMine()">Add Mine</button>
+
+    <div id="comparisonResults"></div>
+
+    <script>
+        let minesData = { Mines: [] }, newOres = {};
+
+        const items = [
+        { name: "Cobblestone", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/6/67/Cobblestone_JE5_BE3.png" },
+        { name: "Stone", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/1/10/Stone_JE6.png/revision/latest?cb=20200315184448" },
+        { name: "Netherrack", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/0/02/Netherrack_JE4_BE2.png" },
+        { name: "Coal Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/3/37/Coal_Ore_JE4_BE3.png" },
+        { name: "Iron Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/0/0c/Iron_Ore_JE3.png" },
+        { name: "Copper Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/81/Copper_Ore_%28D%29_BE2.png" },
+        { name: "Gold Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/9/9b/Gold_Ore_JE5_BE3.png" },
+        { name: "Redstone Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/c/cd/Redstone_Ore_JE4_BE3.png" },
+        { name: "Emerald Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/5/54/Emerald_Ore_JE3_BE2.png" },
+        { name: "Lapis Lazuli Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/e/ea/Lapis_Lazuli_Ore_JE4_BE4.png" },
+        { name: "Diamond Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/1/1a/Diamond_Ore_JE1_BE1.png" },
+        { name: "Nether Quartz Ore", imageUrl: "https://minecraft.wiki/images/Nether_Quartz_Ore_JE3_BE2.png?f3464" },
+        { name: "Ancient Debris", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/4c/Ancient_Debris_JE1_BE1.png" },
+        { name: "Deepslate Coal Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/e/e1/Deepslate_Coal_Ore_BE1.png" },
+        { name: "Deepslate Iron Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/48/Deepslate_Iron_Ore_JE2_BE1.png" },
+        { name: "Deepslate Copper Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/f/f4/Deepslate_Copper_Ore_JE1_BE1.png" },
+        { name: "Deepslate Gold Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/1/1c/Deepslate_Gold_Ore_JE1.png" },
+        { name: "Deepslate Redstone Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/5/5c/Deepslate_Redstone_Ore_JE1.png" },
+        { name: "Deepslate Emerald Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/9/9c/Deepslate_Emerald_Ore_JE1_BE1.png" },
+        { name: "Deepslate Lapis Lazuli Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/f/f5/Deepslate_Lapis_Lazuli_Ore_%28pre-release_3%29.png" },
+        { name: "Deepslate Diamond Ore", imageUrl: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/c/c7/Deepslate_Diamond_Ore_%28pre-release_2%29.png" },
+    ];
+
+        function loadItems() {
+            const dropdown = document.getElementById('minecraftItems');
+            items.forEach(({ name, imageUrl }) => {
+                const option = new Option(name, imageUrl);
+                if (name === "Cobblestone") option.selected = true;
+                dropdown.add(option);
+            });
+
+            const cobblestoneImageUrl = items.find(item => item.name === "Cobblestone").imageUrl;
+            document.getElementById('selectedImagePreview').src = cobblestoneImageUrl;
+            document.getElementById('imageUrl').value = cobblestoneImageUrl;
+        }
+
+        loadItems();
+
+        function loadJSONFile(event) {
+            const file = event.target.files[0], reader = new FileReader();
+            reader.onload = e => {
+                minesData = JSON.parse(e.target.result);
+                displayMines();
+            };
+            reader.readAsText(file);
+        }
+
+        function displayMines() {
+            const mineDisplay = document.getElementById('mineDisplay');
+            mineDisplay.innerHTML = minesData.Mines.map(mine => {
+                const totalBlocks = mine.totalBlocks || 19220; // Use mine's total blocks if available
+                let maxProfit = Math.max(...Object.values(mine.ores).map(ore => ore.spawnRate * ore.price * totalBlocks / 100));
+                return `
+                    <div class="container">
+                        <h3>${mine.MineName} (Blocks: ${totalBlocks})</h3>
+                        ${Object.entries(mine.ores).map(([name, ore]) => `
+                            <div class="flex ${ore.spawnRate * ore.price * totalBlocks / 100 === maxProfit ? 'highlight' : ''}">
+                                <img src="${ore.imageUrl}" alt="${name}">
+                                <strong>${name}</strong>: Spawn Rate ${ore.spawnRate}, Price ${ore.price}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function saveToJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(minesData));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "mines_data.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function setOreImage() {
+            const selectedImage = document.getElementById('minecraftItems').value;
+            document.getElementById('selectedImagePreview').src = selectedImage;
+            document.getElementById('imageUrl').value = selectedImage;
+        }
+
+        function addOre() {
+            const oreName = document.getElementById('oreName').value;
+            const spawnRate = document.getElementById('spawnRate').value;
+            const price = document.getElementById('price').value;
+            const imageUrl = document.getElementById('imageUrl').value;
+
+            if (!oreName || !spawnRate || !price) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            newOres[oreName] = {
+                spawnRate: parseFloat(spawnRate),
+                price: parseFloat(price),
+                imageUrl: imageUrl || "https://static.wikia.nocookie.net/minecraft_gamepedia/images/6/67/Cobblestone_JE5_BE3.png"
+            };
+
+            document.getElementById('oreName').value = '';
+            document.getElementById('spawnRate').value = '';
+            document.getElementById('price').value = '';
+        }
+
+        function addNewMine() {
+            const mineName = document.getElementById('newMineName').value;
+            const totalBlocks = parseInt(document.getElementById('totalBlocks').value) || 19220;
+
+            if (!mineName || Object.keys(newOres).length === 0) {
+                alert('Please enter a mine name and add at least one ore.');
+                return;
+            }
+
+            minesData.Mines.push({
+                MineName: mineName,
+                totalBlocks: totalBlocks,
+                ores: { ...newOres }
+            });
+
+            newOres = {};
+            document.getElementById('newMineName').value = '';
+            document.getElementById('totalBlocks').value = 19220;
+            displayMines();
+        }
+    </script>
+</body>
+</html>
