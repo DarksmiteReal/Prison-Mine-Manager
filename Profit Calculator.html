@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mine Profit Calculator</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        img {
+            width: 50px;
+            height: auto;
+            margin-right: 10px;
+        }
+        .mine, .ore, .sorted-mine {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .sorted-list {
+            margin-top: 40px;
+        }
+        input, button {
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        button {
+            cursor: pointer;
+        }
+        input[type="file"] {
+            color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mine Profit Calculator</h1>
+    <input type="file" id="fileInput" accept=".json">
+    <button id="calculateButton" disabled>Beräkna Profit</button>
+    <button id="toggleViewButton" disabled>Visa ores</button>
+    <div id="results"></div>
+    <div id="sortedResults" class="sorted-list"></div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('calculateButton').addEventListener('click', calculateProfit);
+        document.getElementById('toggleViewButton').addEventListener('click', toggleView);
+
+        let minesData;
+        let currentView = 'mines';
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        minesData = JSON.parse(e.target.result);
+                        document.getElementById('calculateButton').disabled = false;
+                        document.getElementById('toggleViewButton').disabled = false;
+                    } catch (error) {
+                        alert('Fel i JSON-formatet.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function calculateProfit() {
+            const resultsDiv = document.getElementById('results');
+            const sortedResultsDiv = document.getElementById('sortedResults');
+            resultsDiv.innerHTML = '';
+            sortedResultsDiv.innerHTML = '';
+
+            if (currentView === 'mines') {
+                displayMines();
+                displaySortedMines();
+            } else {
+                displayOres();
+            }
+        }
+
+        function displayMines() {
+            const resultsDiv = document.getElementById('results');
+            const formatter = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 2 });
+
+            minesData.Mines.forEach(mine => {
+                let totalProfit = 0;
+                const mineDiv = document.createElement('div');
+                mineDiv.className = 'mine';
+                mineDiv.innerHTML = `<h2>${mine.MineName}</h2><p>Total Blocks: ${mine.totalBlocks}</p>`;
+                
+                for (const ore in mine.ores) {
+                    const oreData = mine.ores[ore];
+                    const spawnRate = parseFloat(oreData.spawnRate) / 100;
+                    const blocksFromOre = mine.totalBlocks * spawnRate;
+                    const profitFromOre = blocksFromOre * oreData.price;
+
+                    totalProfit += profitFromOre;
+
+                    mineDiv.innerHTML += `
+                        <div>
+                            <img src="${oreData.imageUrl}" alt="${ore}">
+                            <strong>${ore}</strong>: 
+                            Spawn Rate: ${oreData.spawnRate}, 
+                            Price: ${formatter.format(oreData.price)}, 
+                            Blocks: ${blocksFromOre.toFixed(2)}, 
+                            Profit: ${formatter.format(profitFromOre)}
+                        </div>
+                    `;
+                }
+
+                mineDiv.innerHTML += `<h3>Total Profit: ${formatter.format(totalProfit)}</h3>`;
+                resultsDiv.appendChild(mineDiv);
+
+                // Save total profit to mine object for sorting later
+                mine.totalProfit = totalProfit;
+            });
+        }
+
+        function displaySortedMines() {
+            const sortedResultsDiv = document.getElementById('sortedResults');
+            const formatter = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 2 });
+
+            // Sort mines by total profit in ascending order (least to most profitable)
+            const sortedMines = [...minesData.Mines].sort((a, b) => a.totalProfit - b.totalProfit);
+
+            sortedResultsDiv.innerHTML = '<h2>Sorted Mines by Total Profit (Least to Most Profitable)</h2>';
+            sortedMines.forEach(mine => {
+                const mineDiv = document.createElement('div');
+                mineDiv.className = 'sorted-mine';
+                mineDiv.innerHTML = `
+                    <h3>${mine.MineName}</h3>
+                    <p>Total Profit: ${formatter.format(mine.totalProfit)}</p>
+                `;
+                sortedResultsDiv.appendChild(mineDiv);
+            });
+        }
+
+        function displayOres() {
+            const resultsDiv = document.getElementById('results');
+            const formatter = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 2 });
+            const oreList = {};
+
+            minesData.Mines.forEach(mine => {
+                for (const ore in mine.ores) {
+                    const oreData = mine.ores[ore];
+                    const spawnRate = parseFloat(oreData.spawnRate) / 100;
+                    const blocksFromOre = mine.totalBlocks * spawnRate;
+                    const profitFromOre = blocksFromOre * oreData.price;
+
+                    if (!oreList[ore]) {
+                        oreList[ore] = { totalProfit: 0, mines: [] };
+                    }
+
+                    oreList[ore].totalProfit += profitFromOre;
+                    oreList[ore].mines.push({
+                        mineName: mine.MineName,
+                        blocks: blocksFromOre.toFixed(2),
+                        price: oreData.price,
+                        imageUrl: oreData.imageUrl,
+                        profit: profitFromOre
+                    });
+                }
+            });
+
+            for (const ore in oreList) {
+                const oreDiv = document.createElement('div');
+                oreDiv.className = 'ore';
+                oreDiv.innerHTML = `<h2>${ore}</h2><p>Total Profit: ${formatter.format(oreList[ore].totalProfit)}</p>`;
+                
+                oreList[ore].mines.forEach(mine => {
+                    oreDiv.innerHTML += `
+                        <div>
+                            <img src="${mine.imageUrl}" alt="${mine.mineName}">
+                            <strong>${mine.mineName}</strong>: 
+                            Blocks: ${mine.blocks}, 
+                            Price: ${formatter.format(mine.price)}, 
+                            Profit: ${formatter.format(mine.profit)}
+                        </div>
+                    `;
+                });
+
+                resultsDiv.appendChild(oreDiv);
+            }
+        }
+
+        function toggleView() {
+            currentView = currentView === 'mines' ? 'ores' : 'mines';
+            document.getElementById('calculateButton').click();
+            document.getElementById('toggleViewButton').textContent = currentView === 'mines' ? 'Visa ores' : 'Visa mines';
+        }
+    </script>
+</body>
+</html>
